@@ -23,6 +23,8 @@ public class Main {
     private static final Logger logger = Logger.getLogger(Main.class.getName());
 
     public static void main(String[] args) {
+        long startTime = System.nanoTime(); // Start timing
+
         String apiUrl = "https://htl-assistant.vercel.app/api/projects/sew5";
         ExecutorService executor = Executors.newFixedThreadPool(4);
         List<Future<String>> futures = new ArrayList<>();
@@ -30,7 +32,7 @@ public class Main {
 
         csvLines.add("id,title,word_count,main_word_count,mensch_count,long_words");
 
-        System.out.println("Connecting to DB: " + DB_URL);
+        logger.info("Connecting to DB: " + DB_URL);
 
         try (Connection connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
             logger.info("Connected to Supabase successfully!");
@@ -57,7 +59,7 @@ public class Main {
             for (Future<String> future : futures) {
                 try {
                     String result = future.get();
-                    System.out.println(result);
+                    logger.info("Processed book result: " + result);
                     csvLines.add(result);
 
                     // ✅ Store data in Supabase!
@@ -77,6 +79,11 @@ public class Main {
         } finally {
             executor.shutdown();
         }
+
+        long endTime = System.nanoTime();
+        long duration = (endTime - startTime) / 1_000_000;
+        logger.info("Execution time: " + duration + " ms");
+        System.out.println("Execution time: " + duration + " ms");
     }
 
     private static String fetchJson(String apiUrl) throws IOException {
@@ -105,10 +112,22 @@ public class Main {
 
     private static void writeToDatabase(String result, Connection connection) throws SQLException {
         String[] values = result.split(",", 6);
-        String sql = "INSERT INTO results (id, title, word_count, main_word_count, mensch_count, long_words) VALUES (?, ?, ?, ?, ?, ?)";
+        int id = Integer.parseInt(values[0]);
 
+        // Check if the ID already exists
+        String checkSql = "SELECT COUNT(*) FROM results WHERE id = ?";
+        try (PreparedStatement checkStmt = connection.prepareStatement(checkSql)) {
+            checkStmt.setInt(1, id);
+            ResultSet rs = checkStmt.executeQuery();
+            if (rs.next() && rs.getInt(1) > 0) {
+                logger.warning("Skipping duplicate entry for book ID: " + id);
+                return;
+            }
+        }
+
+        String sql = "INSERT INTO results (id, title, word_count, main_word_count, mensch_count, long_words) VALUES (?, ?, ?, ?, ?, ?)";
         try (PreparedStatement stmt = connection.prepareStatement(sql)) {
-            stmt.setInt(1, Integer.parseInt(values[0]));
+            stmt.setInt(1, id);
             stmt.setString(2, values[1]);
             stmt.setInt(3, Integer.parseInt(values[2]));
             stmt.setInt(4, Integer.parseInt(values[3]));
@@ -119,4 +138,5 @@ public class Main {
             logger.info("Inserted data into Supabase for book: " + values[1]);
         }
     }
+
 }
