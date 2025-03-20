@@ -4,13 +4,23 @@ import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.*;
+import java.sql.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.logging.Logger;
+import java.util.logging.Level;
 import java.util.Scanner;
 import com.google.gson.*;
 
 public class Main {
     private static final String CSV_FILE = "results.csv";
+
+    // Hardcoded Supabase Pooler Connection
+    private static final String DB_URL = "jdbc:postgresql://aws-0-eu-central-1.pooler.supabase.com:5432/postgres";
+    private static final String DB_USER = "postgres.eqkmvnnlhzaerwgzxvnm";
+    private static final String DB_PASSWORD = "ozbozBroja321.";
+
+    private static final Logger logger = Logger.getLogger(Main.class.getName());
 
     public static void main(String[] args) {
         String apiUrl = "https://htl-assistant.vercel.app/api/projects/sew5";
@@ -18,10 +28,13 @@ public class Main {
         List<Future<String>> futures = new ArrayList<>();
         List<String> csvLines = new ArrayList<>();
 
-        // CSV-Header hinzufügen
         csvLines.add("id,title,word_count,main_word_count,mensch_count,long_words");
 
-        try {
+        System.out.println("Connecting to DB: " + DB_URL);
+
+        try (Connection connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
+            logger.info("Connected to Supabase successfully!");
+
             String jsonResponse = fetchJson(apiUrl);
             JsonObject jsonObject = JsonParser.parseString(jsonResponse).getAsJsonObject();
 
@@ -43,19 +56,24 @@ public class Main {
 
             for (Future<String> future : futures) {
                 try {
-                    String result = future.get(); // Ergebnis abrufen
-                    System.out.println(result);  // In der Konsole ausgeben
-                    csvLines.add(result);        // In die CSV-Liste einfügen
+                    String result = future.get();
+                    System.out.println(result);
+                    csvLines.add(result);
+
+                    // ✅ Store data in Supabase!
+                    writeToDatabase(result, connection);
+
                 } catch (InterruptedException | ExecutionException e) {
-                    System.err.println("Error processing book: " + e.getMessage());
+                    logger.severe("Error processing book: " + e.getMessage());
                 }
             }
 
-            // CSV-Datei mit Java NIO schreiben
             writeCsv(csvLines);
 
         } catch (IOException e) {
-            System.err.println("Error fetching or parsing JSON: " + e.getMessage());
+            logger.severe("Error fetching or parsing JSON: " + e.getMessage());
+        } catch (SQLException e) {
+            logger.severe("Database connection error: " + e.getMessage());
         } finally {
             executor.shutdown();
         }
@@ -79,9 +97,26 @@ public class Main {
         Path path = Paths.get(CSV_FILE);
         try {
             Files.write(path, lines, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            System.out.println("CSV successfully written to " + CSV_FILE);
+            logger.info("CSV successfully written to " + CSV_FILE);
         } catch (IOException e) {
-            System.err.println("Error writing CSV file: " + e.getMessage());
+            logger.severe("Error writing CSV file: " + e.getMessage());
+        }
+    }
+
+    private static void writeToDatabase(String result, Connection connection) throws SQLException {
+        String[] values = result.split(",", 6);
+        String sql = "INSERT INTO results (id, title, word_count, main_word_count, mensch_count, long_words) VALUES (?, ?, ?, ?, ?, ?)";
+
+        try (PreparedStatement stmt = connection.prepareStatement(sql)) {
+            stmt.setInt(1, Integer.parseInt(values[0]));
+            stmt.setString(2, values[1]);
+            stmt.setInt(3, Integer.parseInt(values[2]));
+            stmt.setInt(4, Integer.parseInt(values[3]));
+            stmt.setInt(5, Integer.parseInt(values[4]));
+            stmt.setString(6, values[5]);
+
+            stmt.executeUpdate();
+            logger.info("Inserted data into Supabase for book: " + values[1]);
         }
     }
 }
