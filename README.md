@@ -1,5 +1,8 @@
 # SEW5 Jahresprojekt - Buchanalyse
 
+
+![Java CI with Maven](https://github.com/078071/SEWProjektOzea/actions/workflows/maven.yml/badge.svg)
+
 ##  Projektbeschreibung
 Dieses Projekt analysiert Buchdaten aus einer REST-API, verarbeitet sie parallel, speichert die Ergebnisse in einer PostgreSQL-Datenbank und sendet sie anschließend an eine API. Die Verarbeitung beinhaltet:
 - **Wortzählung** mit und ohne Stoppwörter
@@ -79,3 +82,4 @@ Dieses Projekt analysiert Buchdaten aus einer REST-API, verarbeitet sie parallel
 
 ##  Lizenz
 Dieses Projekt ist unter der **MIT-Lizenz** lizenziert. Siehe [LICENSE.txt](LICENSE.txt) für Details.
+
