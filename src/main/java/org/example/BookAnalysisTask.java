@@ -1,12 +1,15 @@
 package org.example;
 
 import java.util.concurrent.Callable;
+import java.util.List;
 
 public class BookAnalysisTask implements Callable<String> {
+    private final int id;
     private final String title;
     private final String text;
 
-    public BookAnalysisTask(String title, String text) {
+    public BookAnalysisTask(int id, String title, String text) {
+        this.id = id;
         this.title = title;
         this.text = text;
     }
@@ -16,12 +19,13 @@ public class BookAnalysisTask implements Callable<String> {
         BookAnalysis analysis = new BookAnalysis(title, text);
 
         return String.format(
-                "Title: %s%nTotal Words: %d%nMain Words (without Stop-Words): %d%n'Mensch' Count: %d%nLong Words (18+ characters): %s%n-------------------------------------------------",
-                title,
+                "%d,%s,%d,%d,%d,%s",
+                id,
+                title.replace(",", ""), // Entfernt Kommas, um CSV nicht zu zerstören
                 analysis.getWordCount(),
                 analysis.getMainWordCount(),
                 analysis.getMenschCount(),
-                analysis.getLongWords()
+                String.join(" ", analysis.getLongWords()) // Liste in eine CSV-Zelle umwandeln
         );
     }
 }
