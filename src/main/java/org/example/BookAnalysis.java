@@ -17,8 +17,14 @@ public class BookAnalysis {
     }
 
     public int getWordCount() {
-        return text.split("\\s+").length;
+        String trimmedText = text.trim();
+        if (trimmedText.isEmpty()) {
+            return 0;
+        }
+        String[] words = trimmedText.split("\\s+");
+        return words.length;
     }
+
 
     public int getMainWordCount() {
         return (int) Arrays.stream(text.split("\\s+"))
