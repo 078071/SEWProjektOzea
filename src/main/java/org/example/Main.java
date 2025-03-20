@@ -11,6 +11,7 @@ import java.util.logging.Logger;
 import java.util.logging.Level;
 import java.util.Scanner;
 import com.google.gson.*;
+import java.util.Base64; // Added for Basic Auth
 
 public class Main {
     private static final String CSV_FILE = "results.csv";
@@ -33,6 +34,9 @@ public class Main {
         csvLines.add("id,title,word_count,main_word_count,mensch_count,long_words");
 
         logger.info("Connecting to DB: " + DB_URL);
+
+        // TEST Basic Auth Header
+        System.out.println("Basic Auth Header: " + getBasicAuthHeader());
 
         try (Connection connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
             logger.info("Connected to Supabase successfully!");
@@ -62,7 +66,7 @@ public class Main {
                     logger.info("Processed book result: " + result);
                     csvLines.add(result);
 
-                    // ✅ Store data in Supabase!
+                    // Store data in Supabase!
                     writeToDatabase(result, connection);
 
                 } catch (InterruptedException | ExecutionException e) {
@@ -84,6 +88,14 @@ public class Main {
         long duration = (endTime - startTime) / 1_000_000;
         logger.info("Execution time: " + duration + " ms");
         System.out.println("Execution time: " + duration + " ms");
+    }
+
+    //  Basic Authentication Function
+    private static String getBasicAuthHeader() {
+        String username = "student";
+        String password = "supersecret";
+        String auth = username + ":" + password;
+        return "Basic " + Base64.getEncoder().encodeToString(auth.getBytes());
     }
 
     private static String fetchJson(String apiUrl) throws IOException {
@@ -138,5 +150,4 @@ public class Main {
             logger.info("Inserted data into Supabase for book: " + values[1]);
         }
     }
-
 }
