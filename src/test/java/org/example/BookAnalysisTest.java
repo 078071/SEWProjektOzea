@@ -5,9 +5,20 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import java.util.List;
 
+/**
+ * Unit tests for the BookAnalysis class.
+ * Verifies the accuracy of word counting, stop-word filtering,
+ * "Mensch" detection, and long word identification.
+ *
+ * @author Ozea Gjoni
+ * @version 1.0
+ */
 public class BookAnalysisTest {
 
-
+    /**
+     * Tests the word count method.
+     * Ensures that words are counted correctly, including edge cases like empty strings.
+     */
     @Test
     void testGetWordCount() {
         BookAnalysis book = new BookAnalysis("Test", "Das ist ein Test.");
@@ -19,6 +30,10 @@ public class BookAnalysisTest {
         assertEquals(0, emptyBook.getWordCount());
     }
 
+    /**
+     * Tests the main word count method.
+     * Ensures that stop words are correctly filtered out from the total word count.
+     */
     @Test
     void testGetMainWordCount() {
         BookAnalysis book = new BookAnalysis("Test", "Das ist ein schöner Test und die Prüfung.");
@@ -28,6 +43,10 @@ public class BookAnalysisTest {
         assertEquals(0, allStopWords.getMainWordCount());
     }
 
+    /**
+     * Tests the detection of occurrences of the word "Mensch."
+     * Ensures only exact matches (case-insensitive) are counted.
+     */
     @Test
     void testGetMenschCount() {
         BookAnalysis book = new BookAnalysis("Test", "Mensch und menschliche Menschen sind freundlich.");
@@ -37,6 +56,10 @@ public class BookAnalysisTest {
         assertEquals(0, noMensch.getMenschCount());
     }
 
+    /**
+     * Tests the detection of long words (19+ characters).
+     * Ensures that only words above the threshold are identified.
+     */
     @Test
     void testGetLongWords() {
         BookAnalysis book = new BookAnalysis("Test", "Superkalifragilistischesexpialigetisch ist ein langes Wort.");
