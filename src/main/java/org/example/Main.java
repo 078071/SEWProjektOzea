@@ -1,6 +1,7 @@
 package org.example;
 
 import java.io.IOException;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.file.*;
@@ -11,12 +12,11 @@ import java.util.logging.Logger;
 import java.util.logging.Level;
 import java.util.Scanner;
 import com.google.gson.*;
-import java.util.Base64; // Added for Basic Auth
+import java.util.Base64;
 
 public class Main {
     private static final String CSV_FILE = "results.csv";
 
-    // Hardcoded Supabase Pooler Connection
     private static final String DB_URL = "jdbc:postgresql://aws-0-eu-central-1.pooler.supabase.com:5432/postgres";
     private static final String DB_USER = "postgres.eqkmvnnlhzaerwgzxvnm";
     private static final String DB_PASSWORD = "ozbozBroja321.";
@@ -24,7 +24,7 @@ public class Main {
     private static final Logger logger = Logger.getLogger(Main.class.getName());
 
     public static void main(String[] args) {
-        long startTime = System.nanoTime(); // Start timing
+        long startTime = System.nanoTime();
 
         String apiUrl = "https://htl-assistant.vercel.app/api/projects/sew5";
         ExecutorService executor = Executors.newFixedThreadPool(4);
@@ -35,7 +35,6 @@ public class Main {
 
         logger.info("Connecting to DB: " + DB_URL);
 
-        // TEST Basic Auth Header
         System.out.println("Basic Auth Header: " + getBasicAuthHeader());
 
         try (Connection connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD)) {
@@ -49,6 +48,7 @@ public class Main {
             }
 
             JsonArray booksArray = jsonObject.getAsJsonArray("books");
+            String uuid = jsonObject.get("uuid").getAsString();
 
             for (JsonElement element : booksArray) {
                 JsonObject bookObject = element.getAsJsonObject();
@@ -66,7 +66,6 @@ public class Main {
                     logger.info("Processed book result: " + result);
                     csvLines.add(result);
 
-                    // Store data in Supabase!
                     writeToDatabase(result, connection);
 
                 } catch (InterruptedException | ExecutionException e) {
@@ -76,6 +75,21 @@ public class Main {
 
             writeCsv(csvLines);
 
+            long endTime = System.nanoTime();
+            long duration = (endTime - startTime) / 1_000_000;
+            logger.info("Execution time: " + duration + " ms");
+            System.out.println("Execution time: " + duration + " ms");
+
+            // ✅ Send results to the API
+            String jsonPayload = createJsonPayload(uuid, duration, csvLines);
+            logger.info("Sending results to API...");
+
+            try {
+                sendPostRequest(jsonPayload);
+            } catch (IOException e) {
+                logger.severe("Failed to send POST request: " + e.getMessage());
+            }
+
         } catch (IOException e) {
             logger.severe("Error fetching or parsing JSON: " + e.getMessage());
         } catch (SQLException e) {
@@ -83,14 +97,8 @@ public class Main {
         } finally {
             executor.shutdown();
         }
-
-        long endTime = System.nanoTime();
-        long duration = (endTime - startTime) / 1_000_000;
-        logger.info("Execution time: " + duration + " ms");
-        System.out.println("Execution time: " + duration + " ms");
     }
 
-    //  Basic Authentication Function
     private static String getBasicAuthHeader() {
         String username = "student";
         String password = "supersecret";
@@ -126,7 +134,6 @@ public class Main {
         String[] values = result.split(",", 6);
         int id = Integer.parseInt(values[0]);
 
-        // Check if the ID already exists
         String checkSql = "SELECT COUNT(*) FROM results WHERE id = ?";
         try (PreparedStatement checkStmt = connection.prepareStatement(checkSql)) {
             checkStmt.setInt(1, id);
@@ -150,4 +157,72 @@ public class Main {
             logger.info("Inserted data into Supabase for book: " + values[1]);
         }
     }
+
+    private static String createJsonPayload(String uuid, long duration, List<String> results) {
+        StringBuilder resultsJson = new StringBuilder();
+        resultsJson.append("[");
+
+        for (String result : results.subList(1, results.size())) {
+            String[] parts = result.split(",", 6);
+            resultsJson.append(String.format("""
+            {
+                "id": %s,
+                "title": "%s",
+                "word_count": %s,
+                "main_word_count": %s,
+                "mensch_count": %s,
+                "long_words": "%s"
+            }
+        """, parts[0], parts[1], parts[2], parts[3], parts[4], parts[5]));
+            resultsJson.append(","); // Add comma after each object
+        }
+
+        // ✅ Remove trailing comma
+        if (resultsJson.length() > 1) {
+            resultsJson.deleteCharAt(resultsJson.length() - 1);
+        }
+        resultsJson.append("]");
+
+        return String.format("""
+    {
+        "uuid": "%s",
+        "duration": %d,
+        "name": "Ozea Gjoni",
+        "url": "https://github.com/078071/SEWProjektOzea",
+        "results": %s
+    }
+    """, uuid, duration, resultsJson.toString());
+    }
+
+
+
+    private static void sendPostRequest(String jsonPayload) throws IOException {
+        String apiUrl = "https://htl-assistant.vercel.app/api/projects/sew5";
+
+        // DEBUG: Print JSON payload
+        System.out.println("DEBUG: Sending JSON payload:");
+        System.out.println(jsonPayload);
+
+        HttpURLConnection conn = (HttpURLConnection) new URL(apiUrl).openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json");
+        conn.setRequestProperty("Authorization", getBasicAuthHeader());
+        conn.setDoOutput(true);
+
+        try (OutputStream os = conn.getOutputStream()) {
+            os.write(jsonPayload.getBytes());
+            os.flush();
+        }
+
+        int responseCode = conn.getResponseCode();
+        logger.info("POST Response Code: " + responseCode);
+
+        if (responseCode == 200 || responseCode == 201) {
+            System.out.println("Data successfully sent to API!");
+        } else {
+            System.out.println("Failed to send data. Response Code: " + responseCode);
+        }
+    }
+
+
 }
